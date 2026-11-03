@@ -12,6 +12,9 @@ bin/
 # Output of the go coverage tool
 *.out
 
+# Configuration files
+config.json
+
 # IDEs and Editors
 .idea/
 .vscode/

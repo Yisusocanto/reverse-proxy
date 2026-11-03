@@ -11,6 +11,8 @@ Designed for high resilience, featuring **zero-downtime failover**, **transparen
 - **Round-Robin Load Balancing:** Evenly distributes incoming HTTP traffic across healthy backend pools.
 - **Failover with Transparent Retries:** If a backend server drops connection or becomes unavailable, the proxy disables the node and instantly retries the request against another healthy backend without returning an error to the client.
 - **Active Background Health Checks:** Periodically pings (`time.Ticker`) backend servers in an asynchronous Goroutine to automatically reactivate nodes once they recover.
+- **Header Forwarding:** Injects standard `X-Forwarded-For`, `X-Forwarded-Host`, and `X-Forwarded-Proto` headers via `r.SetXForwarded()`.
+- **Dynamic Configuration:** Loads backend servers dynamically from a JSON configuration file specified via CLI flag.
 - **Thread-Safe & Lock-Free State:** Employs `sync/atomic.Bool` for backend active states, eliminating lock contention on hot read paths.
 - **Graceful Shutdown:** Respects OS interruption signals (`SIGINT`, `SIGTERM`) with a configurable graceful shutdown context to drain in-flight requests.
 - **Zero Third-Party Dependencies:** 100% built with Go's standard library.
@@ -29,6 +31,7 @@ Designed for high resilience, featuring **zero-downtime failover**, **transparen
                               |    Reverse Proxy (:8000)      |
                               |  - Round-Robin Scheduler      |
                               |  - Active Health Checker      |
+                              |  - Config Loader (JSON)       |
                               +---------------+---------------+
                                               |
                      +------------------------+------------------------+
@@ -47,20 +50,46 @@ Designed for high resilience, featuring **zero-downtime failover**, **transparen
 ### 1. Prerequisites
 - [Go 1.22+](https://go.dev/dl/) installed.
 
-### 2. Run Mock Backend Servers
+### 2. Configuration (`config.json`)
+Create your `config.json` file in the root directory (you can copy `config.example.json`):
+
+```bash
+cp config.example.json config.json
+```
+
+Example `config.json`:
+```json
+{
+  "servers": [
+    "http://localhost:8001",
+    "http://localhost:8002",
+    "http://localhost:8003"
+  ]
+}
+```
+
+> **Note:** `config.json` is ignored by git to prevent committing local environment endpoints. Use `config.example.json` as a template.
+
+---
+
+### 3. Run Mock Backend Servers
 To quickly test the load balancer, start the bundled mock servers (runs 3 backends on ports 8001, 8002, and 8003):
 ```bash
 go run examples/mock_servers.go
 ```
 
-### 3. Start the Reverse Proxy
+### 4. Start the Reverse Proxy
 In another terminal, start the reverse proxy:
 ```bash
+# Uses default config.json
 go run main.go
+
+# Or specify a custom configuration path
+go run main.go -config path/to/my-config.json
 ```
 The reverse proxy listens on `http://localhost:8000`.
 
-### 4. Send Requests
+### 5. Send Requests
 Send requests to the proxy:
 ```bash
 curl http://localhost:8000
@@ -94,9 +123,10 @@ go test -v ./proxy/...
 
 ```
 reverse-proxy/
-├── .gitignore             # Git ignore rules for Go and IDE files
+├── .gitignore             # Git ignore rules (ignores .idea/, config.json, *.exe)
 ├── go.mod                 # Go module definition
-├── main.go                # Application entrypoint & HTTP server configuration
+├── main.go                # Application entrypoint & CLI flag/config loader
+├── config.example.json    # Example configuration file template
 ├── proxy/
 │   ├── proxy.go           # Core Balancer, Proxy, and HealthCheck logic
 │   └── proxy_test.go      # Comprehensive unit, failover, and concurrency tests

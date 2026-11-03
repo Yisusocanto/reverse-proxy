@@ -42,6 +42,7 @@ func NewBalancer(urls []string) *Balancer {
 		serverProxy.ReverseProxy = &httputil.ReverseProxy{
 			Rewrite: func(r *httputil.ProxyRequest) {
 				r.SetURL(url)
+				r.SetXForwarded()
 			},
 			ErrorHandler: func(w http.ResponseWriter, r *http.Request, err error) {
 				log.Printf("Disabling proxy %s due to error: %v", u, err.Error())
@@ -89,7 +90,6 @@ func (b *Balancer) DisableProxy(p *Proxy) {
 
 func (b *Balancer) HealthCheck() {
 	for _, p := range b.Proxies {
-		log.Printf("Testing the server: %v\n", p.Url)
 		r, err := http.Get(p.Url.String())
 		if err != nil || r.StatusCode >= 500 {
 			p.IsActive.Store(false)

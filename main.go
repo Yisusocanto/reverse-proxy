@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"flag"
 	"log"
 	"net/http"
 	"os"
@@ -12,11 +14,25 @@ import (
 	"time"
 )
 
+type Config struct {
+	Servers []string `json:"servers"`
+}
+
 func main() {
 	mux := http.NewServeMux()
 
-	urls := []string{"http://localhost:8001", "http://localhost:8002", "http://localhost:8003"}
-	balancer := proxy.NewBalancer(urls)
+	configPath := flag.String("config", "config.json", "The path of the config file")
+	flag.Parse()
+	configBytes, err := os.ReadFile(*configPath)
+	if err != nil {
+		log.Printf("Error open the config file: %v", err)
+	}
+	var config Config
+	if err := json.Unmarshal(configBytes, &config); err != nil {
+		log.Printf("Error parsing the config json")
+	}
+
+	balancer := proxy.NewBalancer(config.Servers)
 	mux.HandleFunc("GET /", balancer.Handler)
 
 	server := &http.Server{
